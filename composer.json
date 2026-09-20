@@ -1,0 +1,12 @@
+{
+  "name": "namwansoft/internal-payment",
+  "description": "Library สำหรับเชื่อมต่อระบบชำระเงินภายใน",
+  "require": {
+    "guzzlehttp/guzzle": "^7.15"
+  },
+  "autoload": {
+    "psr-4": {
+      "NamwanSoft\\Payment\\": "src/"
+    }
+  }
+}
