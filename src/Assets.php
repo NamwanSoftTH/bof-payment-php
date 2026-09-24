@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NamwanSoft\Payment;
+namespace namwansoft\payment;
 
 class Assets
 {

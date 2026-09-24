@@ -4,7 +4,7 @@ composer update mycompany/internal-payment
 
 require 'vendor/autoload.php';
 
-use NamwanSoft\Payment\Internal;
+use namwansoft\payment\Internal;
 
 $payment = new Internal();
 

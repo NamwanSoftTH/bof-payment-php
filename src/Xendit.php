@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NamwanSoft\Payment;
+namespace namwansoft\payment;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
