@@ -38,6 +38,18 @@ class Xendit
         ]);
     }
 
+    public function setWalletId(string $walletId): self
+    {
+        $this->walletId = $walletId;
+        return $this;
+    }
+
+    public function setUrlHook(string $UrlHook): self
+    {
+        $this->UrlHook = $UrlHook;
+        return $this;
+    }
+
     /**
      * ตรวจสอบยอดเงินคงเหลือ (Balance)
      */
