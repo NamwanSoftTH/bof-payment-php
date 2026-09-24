@@ -6,21 +6,20 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use thamtech\uuid\helpers\UuidHelper;
 
-class Xendit
+class Beam
 {
     private $client;
-    private $Url, $UrlHook, $Auth, $PriK, $PubK, $WHookK, $walletId;
+    private $Url, $UrlHook, $Auth, $Key, $WHookK, $walletId;
     private $apiVersion = '2024-11-11';
 
     public function __construct(array $key = [], $walletId = null, $UrlHook = null)
     {
-        $this->Url = 'https://api.xendit.co/';
-        $this->PubK = $key['pub'];
-        $this->PriK = $key['pri'];
+        $this->Url = 'https://api.beamcheckout.com/api/';
+        $this->Key = $key['key'];
         $this->WHookK = $key['hook'];
         $this->walletId = $walletId;
         $this->UrlHook = $UrlHook;
-        $this->Auth = 'Basic ' . base64_encode($this->PriK . ':');
+        $this->Auth = 'Basic ' . base64_encode("{$this->walletId}:{$this->Key}");
 
         $this->client = new Client([
             'base_uri' => rtrim($this->Url, '/') . '/',
@@ -29,220 +28,47 @@ class Xendit
                 'Authorization' => $this->Auth,
                 'Accept' => 'application/json',
                 'Accept-Language' => 'th',
-                'api-version'     => $this->apiVersion,
-                'for-user-id' => $this->walletId,
-                'webhook-url' => $this->UrlHook,
             ]
         ]);
     }
 
     /**
-     * ตรวจสอบยอดเงินคงเหลือ (Balance)
+     * $refId (Unique identifier for the charge)
+     * $amount (Amount to be charged)
+     * $timeOut (Time in minutes before the charge expires)
+     * $urlReturn (URL to redirect after payment)
      */
-    public function balance()
-    {
-        try {
-            $response = $this->client->get('balance');
-            return [
-                'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
-            ];
-        } catch (RequestException $e) {
-            $errorResponseBody = $e->hasResponse()
-                ? json_decode($e->getResponse()->getBody()->getContents(), true)
-                : null;
-            return [
-                'status' => false,
-                'message' => $e->getMessage(),
-                'error'   => $errorResponseBody
-            ];
-        }
-    }
-
-    /**
-     * รายการ (Transaction)
-     */
-    public function transactions(string $txnId = null)
-    {
-        try {
-            $response = $this->client->get('transactions' . ($txnId ? '/' . $txnId : ''));
-            return [
-                'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
-            ];
-        } catch (RequestException $e) {
-            $errorResponseBody = $e->hasResponse()
-                ? json_decode($e->getResponse()->getBody()->getContents(), true)
-                : null;
-            return [
-                'status' => false,
-                'message' => $e->getMessage(),
-                'error'   => $errorResponseBody
-            ];
-        }
-    }
-
-    /**
-     * สร้าง Payment Request
-     */
-    public function createPayment(string $refId, float $amount, string $channelType = 'Qr', string $channelCode = 'PROMPTPAY', int $timeOut = null, array $assets = [])
+    public function createCharge(string $refId = null, float $amount = null, int $timeOut = null, string $urlReturn = null)
     {
         if ($timeOut) {
             $Day = new \DateTime("NOW +" . $timeOut . " minutes", new \DateTimeZone('GMT+0'));
             $assets['expires_at'] = $Day->format(DATE_ATOM);
         }
-        $channelData = self::$arChannel[$channelType][$channelCode];
         try {
             $payload = [
-                'type' => 'PAY',
-                'country' => 'TH',
+                'merchantID'    => $this->walletId,
+                'referenceId'   => $refId ? $refId : 'Ch-' . UuidHelper::uuid(),
+                'amount'        => $amount * 100,
+                'returnUrl' => $urlReturn ?? $this->UrlHook,
                 'currency' => 'THB',
-                'channel_code' => $channelData['key'],
-                'reference_id' => $refId ? $refId : 'PY-' . UuidHelper::uuid(),
-                'request_amount' => $amount,
-                'metadata' => []
-            ];
-            foreach ($channelData['req']['channel_properties'] as $key => $value) {
-                $payload['channel_properties'][$value] = ${$value} ?? $assets[$value] ?? null;
-            }
-            $response = $this->client->post('v3/payment_requests', ['json' => $payload]);
-            return [
-                'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
-            ];
-        } catch (RequestException $e) {
-            $errorResponseBody = $e->hasResponse()
-                ? json_decode($e->getResponse()->getBody()->getContents(), true)
-                : null;
-            return [
-                'status' => false,
-                'message' => $e->getMessage(),
-                'error'   => $errorResponseBody
-            ];
-        }
-    }
-
-    /**
-     * ดึง Payment Request
-     */
-    public function getPayment(string $txnId)
-    {
-        try {
-            $response = $this->client->get('v3/payment_requests/' . $txnId);
-            return [
-                'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
-            ];
-        } catch (RequestException $e) {
-            $errorResponseBody = $e->hasResponse()
-                ? json_decode($e->getResponse()->getBody()->getContents(), true)
-                : null;
-            return [
-                'status' => false,
-                'message' => $e->getMessage(),
-                'error'   => $errorResponseBody
-            ];
-        }
-    }
-
-    /**
-     * ยกเลิก Payment Request
-     */
-    public function cancelPayment(string $txnId)
-    {
-        try {
-            $response = $this->client->post('v3/payment_requests/' . $txnId . '/cancel');
-            return [
-                'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
-            ];
-        } catch (RequestException $e) {
-            $errorResponseBody = $e->hasResponse()
-                ? json_decode($e->getResponse()->getBody()->getContents(), true)
-                : null;
-            return [
-                'status' => false,
-                'message' => $e->getMessage(),
-                'error'   => $errorResponseBody
-            ];
-        }
-    }
-
-    /**
-     * สร้างรายการโอนเงินออก (Payout / Disbursement)
-     *
-     * @param string|null $refId เลขอ้างอิงของออเดอร์/การถอน
-     * @param float $amount จำนวนเงินที่ต้องการโอน
-     * @param string $channelCode รหัสธนาคาร เช่น TH_KBANK, TH_SCB, TH_PROMPTPAY
-     * @param string $accountNumber เลขบัญชีธนาคาร หรือ เบอร์ PromptPay
-     * @param string $accountHolderName ชื่อเจ้าของบัญชี
-     * @param string $description รายละเอียดการโอน
-     * @return array
-     */
-    public function createPayout(
-        string $refId = null,
-        float $amount = 0,
-        string $channelCode = 'TH_PROMPTPAY',
-        string $accountNumber = '',
-        string $accountHolderName = '',
-        string $description = 'Payout'
-    ) {
-        return ['status' => false];
-        try {
-            $payload = [
-                'currency'            => 'THB',
-                'reference_id'        => $refId ? $refId : 'PO-' . UuidHelper::uuid(),
-                'source_of_fund'      => 'BUSINESS_REVENUE',
-                'purpose_code'         => 'SALARY',
-                'description'         => $description,
-                'recipient' => [
-                    'type' => 'INDIVIDUAL', // INDIVIDUAL , BUSINESS
-                    'given_name' => '',
-                    'surname' => '',
-                    'relationship' => 'OTHER',
-                    'details' => [
-                        'personal_mobile_number' => ''
-                    ],
-                    'account_details' => [
-                        'currency' => 'THB',
-                        'account_country' => 'TH',
-                        'account_number'      => $accountNumber,
-                        'account_holder_name' => $accountHolderName,
-                        'routing_type_1' => '', //[ "SWIFT", "IBAN", "SORT_CODE", "ABA", "BSB", "WALLET", "CLABE", "MOBILE_NO", "BUSINESS_REG_NO", "NATIONAL_ID" ]
-                        'routing_value_1' => ''
-                    ],
-                    'address' => [
-                        "country" => "PH",
-                        "street_line_1" => "123 Rizal Avenue",
-                        "city" => "Manila",
-                        "province_state" => "Metro Manila",
-                        "postal_code" => "1000"
+                'paymentMethod' => [
+                    'paymentMethodType' => 'QR_PROMPT_PAY',
+                    'qrPromptPay' => [
+                        'expiresAt' => $assets['expires_at'] ?? null
                     ]
-                ],
-                "payout_details" => [
-                    "source_currency" => "PHP",
-                    "source_amount" => 50000,
-                    "destination_currency" => "PHP"
-                ],
-                'metadata' => []
+                ]
             ];
-            $response = $this->client->post('v3/payouts', [
-                'headers' => [
-                    'api-version' => '2025-09-01',
-                    'idempotency-key' => 'IK-' . ($refId ? $refId : UuidHelper::uuid())
-                ],
-                'json' => $payload
-            ]);
+            $response = $this->client->post('v1/charges', ['json' => $payload]);
             return [
                 'status' => true,
-                'data'   => json_decode($response->getBody()->getContents(), true)
+                'data'    => json_decode($response->getBody()->getContents(), true)
             ];
         } catch (RequestException $e) {
             $errorResponseBody = $e->hasResponse()
                 ? json_decode($e->getResponse()->getBody()->getContents(), true)
                 : null;
             return [
-                'status'  => false,
+                'status' => false,
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -250,28 +76,22 @@ class Xendit
     }
 
     /**
-     * ดึงข้อมูลสถานะการโอนเงิน (Get Payout Status)
-     *
-     * @param string $payoutId
+     * $txnId (Unique identifier for the charge)
      */
-    public function getPayout(string $payoutId)
+    public function getCharge($txnId = null)
     {
         try {
-            $response = $this->client->get('v3/payouts/' . $payoutId, [
-                'headers' => [
-                    'api-version' => '2025-09-01'
-                ]
-            ]);
+            $response = $this->client->get('v1/charges' . ($txnId ? '/' . $txnId : ''));
             return [
                 'status' => true,
-                'data'   => json_decode($response->getBody()->getContents(), true)
+                'data'    => json_decode($response->getBody()->getContents(), true)
             ];
         } catch (RequestException $e) {
             $errorResponseBody = $e->hasResponse()
                 ? json_decode($e->getResponse()->getBody()->getContents(), true)
                 : null;
             return [
-                'status'  => false,
+                'status' => false,
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -279,33 +99,180 @@ class Xendit
     }
 
     /**
-     * ยกเลิก Payout v3 (ทำได้เฉพาะรายการที่สถานะยังเป็น REQUESTED / PENDING)
-     *
-     * @param string $payoutId
+     * $txnId (Unique identifier for the transaction)
+     * $offset (Offset for pagination)
+     * $limit (Number of transactions to retrieve)
      */
-    public function cancelPayout(string $payoutId)
+    public function transactions($txnId = null, $offset = 0, $limit = 20)
     {
+        $endpoint = ($txnId) ? 'v1/transactions/' . $txnId : 'v1/transactions?' . http_build_query(['offset' => $offset, 'limit'  => $limit]);
         try {
-            $response = $this->client->post('v3/payouts/' . $payoutId . '/cancel', [
-                'headers' => [
-                    'api-version' => '2025-09-01'
-                ]
-            ]);
+            $response = $this->client->get($endpoint);
             return [
                 'status' => true,
-                'data'   => json_decode($response->getBody()->getContents(), true)
+                'data'    => json_decode($response->getBody()->getContents(), true)
             ];
         } catch (RequestException $e) {
             $errorResponseBody = $e->hasResponse()
                 ? json_decode($e->getResponse()->getBody()->getContents(), true)
                 : null;
             return [
-                'status'  => false,
+                'status' => false,
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
         }
     }
+
+    /**
+     * $type (Action type: 'get', 'create', 'delete')
+     * $IdOrCode (Pairing code or ID for the bolt connection)
+     */
+    public function boltConnections($type = 'get', $IdOrCode = null)
+    {
+        try {
+            switch (strtolower($type)) {
+                case 'create':
+                    $response = $this->client->post('v1/bolt-connections', ['json' => ['pairingCode' => $IdOrCode]]);
+                    break;
+                case 'get':
+                    $response = $this->client->get('v1/bolt-connections' . ($IdOrCode ? '/' . $IdOrCode : ''));
+                    break;
+                case 'delete':
+                    $response = $this->client->delete('v1/bolt-connections' . ($IdOrCode ? '/' . $IdOrCode : ''));
+                    break;
+                default:
+                    throw new \InvalidArgumentException('Invalid request type: ' . $type);
+            }
+            return [
+                'status' => true,
+                'data'    => json_decode($response->getBody()->getContents(), true)
+            ];
+        } catch (RequestException $e) {
+            $errorResponseBody = $e->hasResponse()
+                ? json_decode($e->getResponse()->getBody()->getContents(), true)
+                : null;
+            return [
+                'status' => false,
+                'message' => $e->getMessage(),
+                'error'   => $errorResponseBody
+            ];
+        }
+    }
+    /**
+     * $boltConnectionId (ID of the bolt connection)
+     * $refId (Reference ID for the charge)
+     * $amount (Amount for the charge)
+     * $type (Payment type: PromptPay, Card, TrueMoney, LinePay, ShopeePay, Alipay, WeChatPay)
+     */
+    public function createBoltIntent(string $boltConnectionId = null, string $refId = null,  float $amount = null, string $type = 'PromptPay')
+    {
+        $playload = [
+            'boltConnectionId' => $boltConnectionId,
+            'referenceId' => $refId ? $refId : 'BI-' . UuidHelper::uuid(),
+            'amount' => $amount * 100,
+            'expiryDurationInSec' => 180,
+            'mode' => ['type' => 'PAIRING'],
+            'currency' => 'THB',
+        ];
+        switch (strtolower($type)) {
+            case 'promptpay':
+                $playload['paymentMethod']['paymentMethodType'] = 'QR_PROMPT_PAY';
+                $playload['paymentMethod']['qrPromptPay'] = new stdClass();
+                break;
+            case 'card':
+                $playload['paymentMethod']['paymentMethodType'] = 'CARD';
+                $playload['paymentMethod']['card'] = new stdClass();
+                break;
+            case 'truemoney':
+                $playload['paymentMethod']['paymentMethodType'] = 'TRUE_MONEY';
+                $playload['paymentMethod']['trueMoney'] = new stdClass();
+                break;
+            case 'linepay':
+                $playload['paymentMethod']['paymentMethodType'] = 'LINE_PAY';
+                $playload['paymentMethod']['linePay'] = new stdClass();
+                break;
+            case 'shopeepay':
+                $playload['paymentMethod']['paymentMethodType'] = 'SHOPEE_PAY';
+                $playload['paymentMethod']['shopeePay'] = new stdClass();
+                break;
+            case 'spaylater':
+                $playload['paymentMethod']['paymentMethodType'] = 'SPAY_LATER';
+                $playload['paymentMethod']['sPayLater'] = new stdClass();
+                break;
+            case 'alipay':
+                $playload['paymentMethod']['paymentMethodType'] = 'ALIPAY';
+                $playload['paymentMethod']['alipay'] = new stdClass();
+                break;
+            case 'wechatpay':
+                $playload['paymentMethod']['paymentMethodType'] = 'WECHAT_PAY';
+                $playload['paymentMethod']['wechatPay'] = new stdClass();
+                break;
+        }
+        try {
+            $response = $this->client->post('v1/bolt-intents', ['json' => $playload]);
+            return [
+                'status' => true,
+                'data'    => json_decode($response->getBody()->getContents(), true)
+            ];
+        } catch (RequestException $e) {
+            $errorResponseBody = $e->hasResponse()
+                ? json_decode($e->getResponse()->getBody()->getContents(), true)
+                : null;
+            return [
+                'status' => false,
+                'message' => $e->getMessage(),
+                'error'   => $errorResponseBody
+            ];
+        }
+    }
+
+    /**
+     * $txnId (Reference ID for the charge)
+     */
+    public function cancelBoltIntent($txnId = null)
+    {
+        try {
+            $response = $this->client->patch('v1/bolt-intents' . ($txnId ? '/' . $txnId : '') . '/cancel');
+            return [
+                'status' => true,
+                'data'    => json_decode($response->getBody()->getContents(), true)
+            ];
+        } catch (RequestException $e) {
+            $errorResponseBody = $e->hasResponse()
+                ? json_decode($e->getResponse()->getBody()->getContents(), true)
+                : null;
+            return [
+                'status' => false,
+                'message' => $e->getMessage(),
+                'error'   => $errorResponseBody
+            ];
+        }
+    }
+
+    /**
+     * $txnId (Reference ID for the charge)
+     */
+    public function getBoltIntent($txnId = null)
+    {
+        try {
+            $response = $this->client->get('v1/bolt-intents' . ($txnId ? '/' . $txnId : ''));
+            return [
+                'status' => true,
+                'data'    => json_decode($response->getBody()->getContents(), true)
+            ];
+        } catch (RequestException $e) {
+            $errorResponseBody = $e->hasResponse()
+                ? json_decode($e->getResponse()->getBody()->getContents(), true)
+                : null;
+            return [
+                'status' => false,
+                'message' => $e->getMessage(),
+                'error'   => $errorResponseBody
+            ];
+        }
+    }
+
 
     public static $arChannel = [
         'Qr' => [

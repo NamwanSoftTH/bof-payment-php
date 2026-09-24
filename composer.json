@@ -2,7 +2,8 @@
   "name": "namwansoft/internal-payment",
   "description": "Library สำหรับเชื่อมต่อระบบชำระเงินภายใน",
   "require": {
-    "guzzlehttp/guzzle": "^7.15"
+    "guzzlehttp/guzzle": "^7.15",
+    "thamtech/yii2-uuid": "*"
   },
   "autoload": {
     "psr-4": {

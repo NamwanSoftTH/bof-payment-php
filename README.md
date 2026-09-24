@@ -6,7 +6,7 @@ require 'vendor/autoload.php';
 
 use NamwanSoft\Payment\Internal;
 
-$payment = new Internal('http://api', 'token');
+$payment = new Internal();
 
 <?php
 // ไฟล์ index.php หรือไฟล์ตั้งค่าเริ่มต้นของระบบ
