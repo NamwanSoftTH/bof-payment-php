@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NamwanSoft\Payment;
 
 use GuzzleHttp\Client;
@@ -15,9 +17,9 @@ class Xendit
     public function __construct(array $key = [], $walletId = null, $UrlHook = null)
     {
         $this->Url = 'https://api.xendit.co/';
-        $this->PubK = $key['pub'];
-        $this->PriK = $key['pri'];
-        $this->WHookK = $key['hook'];
+        $this->PubK = $key['pub'] ?? null;
+        $this->PriK = $key['pri'] ?? null;
+        $this->WHookK = $key['hook'] ?? null;
         $this->walletId = $walletId;
         $this->UrlHook = $UrlHook;
         $this->Auth = 'Basic ' . base64_encode($this->PriK . ':');
