@@ -14,7 +14,7 @@ class Xendit
     private $Url, $UrlHook, $Auth, $PriK, $PubK, $WHookK, $walletId;
     private $apiVersion = '2024-11-11';
 
-    public function __construct(array $key = [], $walletId = null, $UrlHook = null)
+    public function __construct(array $key = [], ?string $walletId = null, ?string $UrlHook = null)
     {
         $this->Url = 'https://api.xendit.co/';
         $this->PubK = $key['pub'] ?? null;
@@ -24,29 +24,37 @@ class Xendit
         $this->UrlHook = $UrlHook;
         $this->Auth = 'Basic ' . base64_encode($this->PriK . ':');
 
+        $this->updateClient();
+    }
+    private function updateClient(): void
+    {
+        if ($this->walletId !== null) {
+            $headers['for-user-id'] = $this->walletId;
+        }
+        if ($this->UrlHook !== null) {
+            $headers['webhook-url'] = $this->UrlHook;
+        }
         $this->client = new Client([
             'base_uri' => rtrim($this->Url, '/') . '/',
-            'timeout'  => 10,
+            'timeout'  => 15,
             'headers'  => [
-                'Authorization' => $this->Auth,
-                'Accept' => 'application/json',
+                'Authorization'   => $this->Auth,
+                'Accept'          => 'application/json',
                 'Accept-Language' => 'th',
                 'api-version'     => $this->apiVersion,
-                'for-user-id' => $this->walletId,
-                'webhook-url' => $this->UrlHook,
-            ]
+            ],
         ]);
     }
-
-    public function setWalletId(string $walletId): self
+    public function setWalletId(?string $walletId): self
     {
         $this->walletId = $walletId;
+        $this->updateClient();
         return $this;
     }
-
-    public function setUrlHook(string $UrlHook): self
+    public function setUrlHook(?string $UrlHook): self
     {
         $this->UrlHook = $UrlHook;
+        $this->updateClient();
         return $this;
     }
 
@@ -67,6 +75,7 @@ class Xendit
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -90,6 +99,7 @@ class Xendit
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -99,7 +109,7 @@ class Xendit
     /**
      * สร้าง Payment Request
      */
-    public function createPayment(string $refId, float $amount, string $channelType = 'Qr', string $channelCode = 'PROMPTPAY', int $timeOut = null, array $assets = [])
+    public function createPayment(string $refId, float $amount, string $channelType = 'Qr', string $channelCode = 'PROMPTPAY', int $timeOut = null, array $metadata = [], array $assets = [])
     {
         if ($timeOut) {
             $Day = new \DateTime("NOW +" . $timeOut . " minutes", new \DateTimeZone('GMT+0'));
@@ -114,7 +124,7 @@ class Xendit
                 'channel_code' => $channelData['key'],
                 'reference_id' => $refId ? $refId : 'PY-' . UuidHelper::uuid(),
                 'request_amount' => $amount,
-                'metadata' => []
+                'metadata' => (object)$metadata
             ];
             foreach ($channelData['req']['channel_properties'] as $key => $value) {
                 $payload['channel_properties'][$value] = ${$value} ?? $assets[$value] ?? null;
@@ -122,7 +132,7 @@ class Xendit
             $response = $this->client->post('v3/payment_requests', ['json' => $payload]);
             return [
                 'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
+                'data'    => json_decode($response->getBody()->getContents(), true),
             ];
         } catch (RequestException $e) {
             $errorResponseBody = $e->hasResponse()
@@ -130,6 +140,7 @@ class Xendit
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -153,6 +164,7 @@ class Xendit
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -176,6 +188,7 @@ class Xendit
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -257,6 +270,7 @@ class Xendit
                 : null;
             return [
                 'status'  => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -286,6 +300,7 @@ class Xendit
                 : null;
             return [
                 'status'  => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -315,6 +330,7 @@ class Xendit
                 : null;
             return [
                 'status'  => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];

@@ -46,8 +46,8 @@ class Internal
 
         $this->apiEndpoint = rtrim($this->apiEndpoint, '/');
         $this->client = new Client([
-            'base_uri' => $this->apiEndpoint . '/',
-            'timeout'  => $this->timeout,
+            'base_uri' => $this->apiEndpoint . '/v3/',
+            'timeout'  => 15,
             'verify'   => false,
             'headers'  => [
                 'Authorization' => 'Bearer ' . $this->apiKey,
@@ -56,71 +56,16 @@ class Internal
         ]);
     }
 
-    public function getPayment(string $provider, string $key, string $idTxn, array $dataAssets = [])
-    {
-        $resData = null;
-        try {
-            $endpoint = $provider . '/check/payment/' . $this->arType[$provider][$key][0];
-            $response = $this->client->post($endpoint, ['json' => [
-                'walletId'   => $dataAssets['walletId'],
-                'refId' => $dataAssets['refId'],
-                'id' => $idTxn,
-            ]]);
-            $response = json_decode((string)$response->getBody(), true);
-            if ($response['status']) {
-                $resData = $response;
-            }
-            switch ($provider) {
-                case 'xendit':
-                    if ($resData['statusOriginal'] === 'SUCCEEDED') {
-                    } else if ($resData['statusOriginal'] === 'FAILED') {
-                    } else if ($resData['statusOriginal'] === 'PENDING') {
-                    } else if ($resData['statusOriginal'] === 'EXPIRED') {
-                    } else if ($resData['statusOriginal'] === 'CANCELED') {
-                    } else if ($resData['statusOriginal'] === 'ACTIVE') {
-                    } else if ($resData['statusOriginal'] === 'INACTIVE') {
-                    }
-                    $resData['statusTx'] = $resData['statusOriginal'];
-                    if ($resData['expires_at']) {
-                        $timeOut = new \DateTime($resData['expires_at']);
-                        $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
-                        $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
-                    }
-                    break;
-                case 'beam':
-                    if ($resData['statusOriginal'] === 'SUCCEEDED') {
-                    } else if ($resData['statusOriginal'] === 'FAILED') {
-                    } else if ($resData['statusOriginal'] === 'ACTIVE') {
-                    } else if ($resData['statusOriginal'] === 'PAID') {
-                    } else if ($resData['statusOriginal'] === 'EXPIRED') {
-                    } else if ($resData['statusOriginal'] === 'CANCELED') {
-                    } else if ($resData['statusOriginal'] === 'VOIDED') {
-                    } else if ($resData['statusOriginal'] === 'REFUNDED') {
-                    }
-                    $resData['statusTx'] = $resData['statusOriginal'];
-                    if ($resData['expiresAt']) {
-                        $timeOut = new \DateTime($resData['expiresAt']);
-                        $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
-                        $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
-                    }
-                    break;
-                default:
-                    break;
-            }
-            return ['status' => true, 'data' => $resData, 'debug' => $response];
-        } catch (RequestException $e) {
-            return ['status' => false, 'message' => $e->getMessage()];
-        }
-    }
-
     public function createPayment(string $provider, string $key, string $ref, float $amount, string $urlCallback, array $dataAssets = [])
     {
         $resData = null;
         try {
-            $endpoint = $provider . '/create/payment/' . $this->arType[$provider][$key][0];
+            $endpoint = $provider . '/create/payment';
             switch ($provider) {
                 case 'xendit':
                     $response = $this->client->post($endpoint, ['json' => [
+                        'channelType' => $this->arType[$provider][$key][0],
+                        'channelCode' => $this->arType[$provider][$key][1],
                         'walletId'   => $dataAssets['walletId'],
                         'webhookUrl' => $urlCallback,
                         'refId'      => $ref,
@@ -129,41 +74,54 @@ class Internal
                         'timeOut'    => $dataAssets['timeOut'] ?? 5,
                     ]]);
                     $response = json_decode((string)$response->getBody(), true);
-                    if ($response['status'] && $key === 'Qr') {
-                        $resData = ['idTxn' => $response['id'], 'qrString'  => $response['qr_string']];
-                    } else if ($response['status']) {
-                        $resData = ['idTxn' => $response['id']];
-                    }
-                    if ($response['expires_at']) {
-                        $timeOut = new \DateTime($response['expires_at']);
-                        $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
-                        $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
+                    if ($response['status']) {
+                        $resData['idTxn'] = $response['data']['payment_request_id'];
+                        switch ($response['data']['status']) {
+                            case 'REQUIRES_ACTION':
+                                break;
+                            default:
+                                break;
+                        }
+                        if ($key === 'Qr') {
+                            $resData['qrString'] = $response['data']['actions'][0]['value'];
+                        }
+                        if ($response['data']['channel_properties']['expires_at']) {
+                            $timeOut = new \DateTime($response['data']['channel_properties']['expires_at']);
+                            $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
+                            $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
+                        }
                     }
                     break;
                 case 'beam':
                     $response = $this->client->post($endpoint, ['json' => [
+                        'channelType' => $this->arType[$provider][$key][0],
+                        'channelCode' => $this->arType[$provider][$key][0],
+                        'walletId'   => $dataAssets['walletId'],
                         'machineId'   => $dataAssets['boltId'],
+                        'webhookUrl' => $urlCallback,
                         'refId'      => $ref,
                         'amount'     => $amount,
                         'timeOut'    => $dataAssets['timeOut'] ?? 5,
                     ]]);
                     $response = json_decode((string)$response->getBody(), true);
-                    if ($response['status'] && $key === 'Qr') {
-                        $resData = ['idTxn' => $response['chargeId'], 'qrString'  => $response['encodedImage']['rawData']];
-                        $response['expiresAt'] = $response['encodedImage']['expiry'];
-                    } else if ($response['status']) {
-                        $resData = ['idTxn' => $response['id']];
-                    }
-                    if ($response['expiresAt']) {
-                        $timeOut = new \DateTime($response['expiresAt']);
-                        $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
-                        $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
+                    if ($response['status']) {
+                        if ($key === 'Qr') {
+                            $resData = ['idTxn' => $response['data']['chargeId'], 'qrString'  => $response['data']['encodedImage']['rawData']];
+                            $response['data']['expiresAt'] = $response['data']['encodedImage']['expiry'];
+                        } else if ($response['data']['status']) {
+                            $resData = ['idTxn' => $response['data']['id']];
+                        }
+                        if ($response['data']['expiresAt']) {
+                            $timeOut = new \DateTime($response['data']['expiresAt']);
+                            $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
+                            $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
+                        }
                     }
                     break;
                 default:
                     break;
             }
-            return ['status' => true, 'data' => $resData, 'debug' => $response];
+            return ['status' => $response['status'], 'data' => $resData, 'debug' => $response];
         } catch (RequestException $e) {
             return ['status' => false, 'message' => $e->getMessage()];
         }
@@ -173,25 +131,83 @@ class Internal
     {
         $resData = null;
         try {
-            $endpoint = $provider . '/cancel/payment/' . $this->arType[$provider][$key][0];
+            $endpoint = $provider . '/cancel/payment';
+            $response = $this->client->post($endpoint, ['json' => [
+                'channelType' => $this->arType[$provider][$key][0],
+                'channelCode' => $this->arType[$provider][$key][1],
+                'walletId' => $dataAssets['walletId'],
+                'id' => $idTxn,
+            ]]);
+            $response = json_decode((string)$response->getBody(), true);
             switch ($provider) {
                 case 'xendit':
-                    $response = $this->client->post($endpoint, ['json' => [
-                        'walletId'   => $dataAssets['walletId'],
-                        'id' => $idTxn,
-                    ]]);
+                    $resData['statusTx'] = $response['data']['status'];
                     break;
                 case 'beam':
-                    $response = $this->client->post($endpoint, ['json' => [
-                        'machineId' => $dataAssets['walletId'],
-                        'id' => $idTxn,
-                    ]]);
+                    $resData['statusTx'] = $response['data']['status'];
                     break;
                 default:
                     break;
             }
+            return ['status' => $response['status'], 'data' => $resData, 'debug' => $response];
+        } catch (RequestException $e) {
+            return ['status' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function getPayment(string $provider, string $key, string $idTxn, array $dataAssets = [])
+    {
+        $resData = null;
+        try {
+            $endpoint = $provider . '/check/payment';
+            $response = $this->client->post($endpoint, ['json' => [
+                'channelType' => $this->arType[$provider][$key][0],
+                'channelCode' => $this->arType[$provider][$key][1],
+                'walletId'   => $dataAssets['walletId'],
+                'refId' => $dataAssets['refId'],
+                'id' => $idTxn,
+            ]]);
             $response = json_decode((string)$response->getBody(), true);
-            $resData = $response['body'];
+            switch ($provider) {
+                case 'xendit':
+                    if ($response['data']['status'] === 'REQUIRES_ACTION') {
+                        $response['data']['status'] = 'ACTIVE';
+                    }
+                    // if ($response['data']['status'] === 'SUCCEEDED') {
+                    // } else if ($response['data']['status'] === 'FAILED') {
+                    // } else if ($response['data']['status'] === 'PENDING') {
+                    // } else if ($response['data']['status'] === 'EXPIRED') {
+                    // } else if ($response['data']['status'] === 'CANCELED') {
+                    // } else if ($response['data']['status'] === 'ACTIVE') {
+                    // } else if ($response['data']['status'] === 'INACTIVE') {
+                    // }
+                    $resData['statusTx'] = $response['data']['status'];
+                    if ($response['data']['channel_properties']['expires_at']) {
+                        $timeOut = new \DateTime($response['data']['channel_properties']['expires_at']);
+                        $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
+                        $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
+                    }
+                    break;
+                case 'beam':
+                    // if ($response['data']['status'] === 'SUCCEEDED') {
+                    // } else if ($response['data']['status'] === 'FAILED') {
+                    // } else if ($response['data']['status'] === 'ACTIVE') {
+                    // } else if ($response['data']['status'] === 'PAID') {
+                    // } else if ($response['data']['status'] === 'EXPIRED') {
+                    // } else if ($response['data']['status'] === 'CANCELED') {
+                    // } else if ($response['data']['status'] === 'VOIDED') {
+                    // } else if ($response['data']['status'] === 'REFUNDED') {
+                    // }
+                    $resData['statusTx'] = $response['data']['status'];
+                    if ($response['data']['expiresAt']) {
+                        $timeOut = new \DateTime($response['data']['expiresAt']);
+                        $timeOut->setTimezone(new \DateTimeZone('Asia/Bangkok'));
+                        $resData['timeOut'] = $timeOut->format('Y-m-d H:i:s');
+                    }
+                    break;
+                default:
+                    break;
+            }
             return ['status' => $response['status'], 'data' => $resData, 'debug' => $response];
         } catch (RequestException $e) {
             return ['status' => false, 'message' => $e->getMessage()];
@@ -222,7 +238,7 @@ class Internal
 
     private $arType = [
         'beam' => [
-            'Qr'        => ['QR_CODE'],
+            'Qr'        => ['Qr'],
             // ''      => ['', ''],
             'PromptPay' => ['PromptPay'],
             'Card'      => ['Card'],
@@ -232,9 +248,9 @@ class Internal
             'WeChatPay' => ['WeChatPay'],
         ],
         'xendit' => [
-            'Qr'        => ['QR_CODE', 'PROMPTPAY'],
+            'Qr'        => ['Qr', 'PROMPTPAY'],
             // ''      => ['', ''],
-            'KBank'     => ['BANK_ACCOUNT', 'KBANK_MB'],
+            'KBANK'     => ['BANK_ACCOUNT', 'KBANK_MB'],
             'SCB'       => ['BANK_ACCOUNT', 'SCB_MB'],
             'KTB'       => ['BANK_ACCOUNT', 'KTB_MB'],
             'BBL'       => ['BANK_ACCOUNT', 'BBL_MB'],

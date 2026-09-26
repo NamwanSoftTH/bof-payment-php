@@ -13,35 +13,39 @@ class Beam
     private $client;
     private $Url, $UrlHook, $Auth, $Key, $WHookK, $walletId;
 
-    public function __construct(array $key = [], $walletId = null, $UrlHook = null)
+    public function __construct(array $key = [], ?string $walletId = null, ?string $UrlHook = null)
     {
         $this->Url = 'https://api.beamcheckout.com/api/';
         $this->Key = $key['key'] ?? null;
         $this->WHookK = $key['hook'] ?? null;
         $this->walletId = $walletId;
         $this->UrlHook = $UrlHook;
-        $this->Auth = 'Basic ' . base64_encode("{$this->walletId}:{$this->Key}");
 
+        $this->updateClient();
+    }
+    private function updateClient(): void
+    {
+        $this->Auth = 'Basic ' . base64_encode("{$this->walletId}:{$this->Key}");
         $this->client = new Client([
             'base_uri' => rtrim($this->Url, '/') . '/',
-            'timeout'  => 10,
+            'timeout'  => 15,
             'headers'  => [
-                'Authorization' => $this->Auth,
-                'Accept' => 'application/json',
+                'Authorization'   => $this->Auth,
+                'Accept'          => 'application/json',
                 'Accept-Language' => 'th',
-            ]
+            ],
         ]);
     }
-
-    public function setWalletId(string $walletId): self
+    public function setWalletId(?string $walletId): self
     {
         $this->walletId = $walletId;
+        $this->updateClient();
         return $this;
     }
-
-    public function setUrlHook(string $UrlHook): self
+    public function setUrlHook(?string $UrlHook): self
     {
         $this->UrlHook = $UrlHook;
+        $this->updateClient();
         return $this;
     }
 
@@ -74,7 +78,7 @@ class Beam
             $response = $this->client->post('v1/charges', ['json' => $payload]);
             return [
                 'status' => true,
-                'data'    => json_decode($response->getBody()->getContents(), true)
+                'data' => json_decode($response->getBody()->getContents(), true)
             ];
         } catch (RequestException $e) {
             $errorResponseBody = $e->hasResponse()
@@ -82,8 +86,9 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
-                'error'   => $errorResponseBody
+                'error'   => $errorResponseBody,
             ];
         }
     }
@@ -105,6 +110,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -117,7 +123,7 @@ class Beam
     public function cancelCharge(string $txnId)
     {
         try {
-            $response = $this->client->post('v1/charges/' . $txnId . '/cancel');
+            $response = $this->client->post("v1/charges/{$txnId}/cancel");
             return [
                 'status' => true,
                 'data'   => json_decode($response->getBody()->getContents(), true)
@@ -128,6 +134,7 @@ class Beam
                 : null;
             return [
                 'status'  => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -141,7 +148,7 @@ class Beam
      */
     public function transactions(string $txnId = null, int $offset = 0, int $limit = 20)
     {
-        $endpoint = ($txnId) ? 'v1/transactions/' . $txnId : 'v1/transactions?' . http_build_query(['offset' => $offset, 'limit'  => $limit]);
+        $endpoint = ($txnId) ? "v1/transactions/{$txnId}" : 'v1/transactions?' . http_build_query(['offset' => $offset, 'limit'  => $limit]);
         try {
             $response = $this->client->get($endpoint);
             return [
@@ -154,6 +161,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -190,6 +198,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -257,6 +266,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -266,10 +276,10 @@ class Beam
     /**
      * $txnId (Reference ID for the charge)
      */
-    public function cancelBoltIntent(string $txnId = null)
+    public function cancelBoltIntent(string $txnId)
     {
         try {
-            $response = $this->client->patch('v1/bolt-intents' . ($txnId ? '/' . $txnId : '') . '/cancel');
+            $response = $this->client->patch("v1/bolt-intents/{$txnId}/cancel");
             return [
                 'status' => true,
                 'data'    => json_decode($response->getBody()->getContents(), true)
@@ -280,6 +290,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -292,7 +303,7 @@ class Beam
     public function getBoltIntent(string $txnId = null)
     {
         try {
-            $response = $this->client->get('v1/bolt-intents' . ($txnId ? '/' . $txnId : ''));
+            $response = $this->client->get("v1/bolt-intents" . ($txnId ? '/' . $txnId : ''));
             return [
                 'status' => true,
                 'data'    => json_decode($response->getBody()->getContents(), true)
@@ -303,6 +314,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
@@ -315,7 +327,7 @@ class Beam
     public function getRefund(string $txnId)
     {
         try {
-            $response = $this->client->get('v1/refunds/' . $txnId);
+            $response = $this->client->get("v1/refunds/{$txnId}");
             return [
                 'status' => true,
                 'data'    => json_decode($response->getBody()->getContents(), true)
@@ -326,6 +338,7 @@ class Beam
                 : null;
             return [
                 'status' => false,
+                'statusCode' => $e->getCode(),
                 'message' => $e->getMessage(),
                 'error'   => $errorResponseBody
             ];
