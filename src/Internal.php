@@ -230,7 +230,7 @@ class Internal
                 default:
                     break;
             }
-            return ['status' => true, 'data' => $resData, 'debug' => $response];
+            return ['status' => $response['status'], 'data' => $resData, 'debug' => $response];
         } catch (RequestException $e) {
             return ['status' => false, 'message' => $e->getMessage()];
         }
