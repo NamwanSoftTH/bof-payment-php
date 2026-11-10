@@ -214,18 +214,65 @@ class Internal
         }
     }
 
-    public function getDevice(string $provider, string $key)
+    public function getDevice(string $provider, string $key, array $dataAssets = [])
     {
         $resData = null;
         try {
-            $endpoint = $provider . '/bolt/' . $key;
+            $endpoint = $provider . '/bolt/get';
             switch ($provider) {
                 case 'xendit':
                     return ['status' => false];
                     break;
                 case 'beam':
-                    $response = $this->client->get($endpoint);
+                    $response = $this->client->post($endpoint, ['json' => ['walletId'   => $dataAssets['walletId'], 'key' => $key]]);
                     $response = json_decode((string)$response->getBody(), true);
+                    $resData = $response['data'];
+                    break;
+                default:
+                    break;
+            }
+            return ['status' => $response['status'], 'data' => $resData, 'debug' => $response];
+        } catch (RequestException $e) {
+            return ['status' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function addDevice(string $provider, string $key, array $dataAssets = [])
+    {
+        $resData = null;
+        try {
+            $endpoint = $provider . '/bolt/add';
+            switch ($provider) {
+                case 'xendit':
+                    return ['status' => false];
+                    break;
+                case 'beam':
+                    $response = $this->client->post($endpoint, ['json' => ['walletId'   => $dataAssets['walletId'], 'key' => $key]]);
+                    $response = json_decode((string)$response->getBody(), true);
+                    $resData = $response['data'];
+                    break;
+                default:
+                    break;
+            }
+            return ['status' => $response['status'], 'data' => $resData, 'debug' => $response];
+        } catch (RequestException $e) {
+            return ['status' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function deleteDevice(string $provider, string $key, array $dataAssets = [])
+    {
+        $resData = null;
+        try {
+            $endpoint = $provider . '/bolt/delete';
+            switch ($provider) {
+                case 'xendit':
+                    return ['status' => false];
+                    break;
+                case 'beam':
+                    $response = $this->client->post($endpoint, ['json' => ['walletId'   => $dataAssets['walletId'], 'key' => $key]]);
+                    $response = json_decode((string)$response->getBody(), true);
+                    $resData = $response['data'];
                     break;
                 default:
                     break;
