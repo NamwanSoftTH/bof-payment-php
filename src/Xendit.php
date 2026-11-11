@@ -127,7 +127,7 @@ class Xendit
                 'metadata' => (object)$metadata
             ];
             foreach ($channelData['req']['channel_properties'] as $key => $value) {
-                $payload['channel_properties'][$value] = ${$value} ?? $assets[$value] ?? null;
+                $payload['channel_properties'][$value] = ${$value} ?? $assets[$value] ?? $assets['channelProperties'][$value] ?? null;
             }
             $response = $this->client->post('v3/payment_requests', ['json' => $payload]);
             return [

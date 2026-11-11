@@ -72,10 +72,14 @@ class Internal
                         'amount'     => $amount,
                         'metaData'   => $dataAssets['metaData'],
                         'timeOut'    => $dataAssets['timeOut'] ?? 5,
+                        'assets' => [
+                            'channelProperties' => $dataAssets['channelProperties']
+                        ],
                     ]]);
                     $response = json_decode((string)$response->getBody(), true);
                     if ($response['status']) {
                         $resData['idTxn'] = $response['data']['payment_request_id'];
+                        $resData['channelCode'] = $response['data']['channel_code'];
                         switch ($response['data']['status']) {
                             case 'REQUIRES_ACTION':
                                 break;
@@ -84,6 +88,8 @@ class Internal
                         }
                         if ($key === 'Qr') {
                             $resData['qrString'] = $response['data']['actions'][0]['value'];
+                        } else if ($response['data']['actions'][0]['type'] === 'REDIRECT_CUSTOMER') {
+                            $resData['urlRedirect'] = $response['data']['actions'][0]['value'];
                         }
                         if ($response['data']['channel_properties']['expires_at']) {
                             $timeOut = new \DateTime($response['data']['channel_properties']['expires_at']);
@@ -297,16 +303,16 @@ class Internal
         'xendit' => [
             'Qr'        => ['Qr', 'PROMPTPAY'],
             // ''      => ['', ''],
-            'KBANK'     => ['BANK_ACCOUNT', 'KBANK_MB'],
-            'SCB'       => ['BANK_ACCOUNT', 'SCB_MB'],
-            'KTB'       => ['BANK_ACCOUNT', 'KTB_MB'],
-            'BBL'       => ['BANK_ACCOUNT', 'BBL_MB'],
-            'BAY'       => ['BANK_ACCOUNT', 'BAY_MB'],
+            'KBANK'     => ['MobileBanking', 'KBANK'],
+            'SCB'       => ['MobileBanking', 'SCB'],
+            'KTB'       => ['MobileBanking', 'KTB'],
+            'BBL'       => ['MobileBanking', 'BBL'],
+            'BAY'       => ['MobileBanking', 'BAY'],
             // ''      => ['', ''],
-            'WeChatPay' => ['EWALLET', 'TH_WECHATPAY'],
-            'LinePay'   => ['EWALLET', 'TH_LINEPAY'],
-            'TrueMoney' => ['EWALLET', 'TH_TRUEMONEY'],
-            'ShopeePay' => ['EWALLET', 'TH_SHOPEEPAY'],
+            'WeChatPay' => ['EWallet', 'WECHATPAY'],
+            'LinePay'   => ['EWallet', 'LINEPAY'],
+            'TrueMoney' => ['EWallet', 'TRUEMONEY'],
+            'ShopeePay' => ['EWallet', 'SHOPEEPAY'],
         ]
     ];
 }
