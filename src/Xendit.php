@@ -85,7 +85,7 @@ class Xendit
     /**
      * รายการ (Transaction)
      */
-    public function transactions(string $txnId = null)
+    public function transactions(?string $txnId = null)
     {
         try {
             $response = $this->client->get('transactions' . ($txnId ? '/' . $txnId : ''));
@@ -109,7 +109,7 @@ class Xendit
     /**
      * สร้าง Payment Request
      */
-    public function createPayment(string $refId, float $amount, string $channelType = 'Qr', string $channelCode = 'PROMPTPAY', int $timeOut = null, array $metadata = [], array $assets = [])
+    public function createPayment(string $refId, float $amount, string $channelType = 'Qr', string $channelCode = 'PROMPTPAY', ?int $timeOut = null, array $metadata = [], array $assets = [])
     {
         if ($timeOut) {
             $Day = new \DateTime("NOW +" . $timeOut . " minutes", new \DateTimeZone('GMT+0'));
@@ -207,7 +207,7 @@ class Xendit
      * @return array
      */
     public function createPayout(
-        string $refId = null,
+        ?string $refId = null,
         float $amount = 0,
         string $channelCode = 'TH_PROMPTPAY',
         string $accountNumber = '',

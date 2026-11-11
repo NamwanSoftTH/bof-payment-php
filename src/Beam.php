@@ -55,7 +55,7 @@ class Beam
      * $timeOut (Time in minutes before the charge expires)
      * $urlReturn (URL to redirect after payment)
      */
-    public function createCharge(string $refId = null, float $amount = null, int $timeOut = null, string $urlReturn = null)
+    public function createCharge(?string $refId = null, ?float $amount = null, ?int $timeOut = null, ?string $urlReturn = null)
     {
         if ($timeOut) {
             $Day = new \DateTime("NOW +" . $timeOut . " minutes", new \DateTimeZone('GMT+0'));
@@ -96,7 +96,7 @@ class Beam
     /**
      * $txnId (Unique identifier for the charge)
      */
-    public function getCharge(string $txnId = null)
+    public function getCharge(?string $txnId = null)
     {
         try {
             $response = $this->client->get('v1/charges' . ($txnId ? '/' . $txnId : ''));
@@ -146,7 +146,7 @@ class Beam
      * $offset (Offset for pagination)
      * $limit (Number of transactions to retrieve)
      */
-    public function transactions(string $txnId = null, int $offset = 0, int $limit = 20)
+    public function transactions(?string $txnId = null, int $offset = 0, int $limit = 20)
     {
         $endpoint = ($txnId) ? "v1/transactions/{$txnId}" : 'v1/transactions?' . http_build_query(['offset' => $offset, 'limit'  => $limit]);
         try {
@@ -172,7 +172,7 @@ class Beam
      * $type (Action type: 'get', 'create', 'delete')
      * $IdOrCode (Pairing code or ID for the bolt connection)
      */
-    public function boltConnections(string $type = 'get', string $IdOrCode = null)
+    public function boltConnections(string $type = 'get', ?string $IdOrCode = null)
     {
         try {
             switch (strtolower($type)) {
@@ -210,7 +210,7 @@ class Beam
      * $amount (Amount for the charge)
      * $type (Payment type: PromptPay, Card, TrueMoney, LinePay, ShopeePay, Alipay, WeChatPay)
      */
-    public function createBoltIntent(string $boltConnectionId = null, string $refId = null,  float $amount = null, string $type = 'PromptPay')
+    public function createBoltIntent(?string $boltConnectionId = null, ?string $refId = null,  ?float $amount = null, string $type = 'PromptPay')
     {
         $payload = [
             'boltConnectionId' => $boltConnectionId,
@@ -300,7 +300,7 @@ class Beam
     /**
      * $txnId (Reference ID for the charge)
      */
-    public function getBoltIntent(string $txnId = null)
+    public function getBoltIntent(?string $txnId = null)
     {
         try {
             $response = $this->client->get("v1/bolt-intents" . ($txnId ? '/' . $txnId : ''));
